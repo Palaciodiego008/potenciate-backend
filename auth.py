@@ -5,10 +5,10 @@ from fastapi import HTTPException
 from models import User
 from repository import get_user_by_email
 import hashlib
+from sqlalchemy.orm import Session
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
 
 pwd_context = CryptContext(schemes=["bcrypt"], bcrypt__default_rounds=12)
 
@@ -42,3 +42,23 @@ def get_user_by_email_from_db(db, email: str):
     if not db_user:
         raise HTTPException(status_code=404, detail="User with this email does not exist")
     return db_user
+
+def verify_token(token: str, db: Session):
+    try:
+        # Decodificar el token JWT usando la clave secreta del usuario
+        payload = jwt.decode(token, options={"verify_exp": False}, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")  # 'sub' almacena el email o identificador único
+
+        if user_id is None:
+            raise HTTPException(status_code=403, detail="Token is invalid")
+
+        user = db.query(User).filter(User.email == user_id).first()
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return user
+
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Token is invalid")
