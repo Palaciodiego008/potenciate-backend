@@ -35,13 +35,8 @@ def login_user(user: UserLogin, db: Session = Depends(get_db)):
     if not authenticated_user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    access_token = create_access_token(data={"sub": authenticated_user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
-
-## sample endpoint hello world
-@router.get("/hello")
-def hello_world():
-    return {"message": "Hello, World!"}
+    access_token = create_access_token(user=authenticated_user, data={"sub": authenticated_user.email})
+    return {"access_token": access_token}
 
 
 @router.get("/users")

@@ -9,12 +9,10 @@ import hashlib
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+pwd_context = CryptContext(schemes=["bcrypt"], bcrypt__default_rounds=12)
 
 def generate_secret_key(user: User):
-    """
-    Generate a user-specific secret key using a hash of the user's ID and email.
-    """
     user_data = f"{user.id}{user.email}"
     return hashlib.sha256(user_data.encode()).hexdigest()
 
@@ -25,13 +23,10 @@ def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def create_access_token(user: User, data: dict, expires_delta: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)):
-    """
-    Create a JWT access token using a user-specific secret key.
-    """
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + expires_delta  # Use timezone-aware datetime
+    expire = datetime.now(timezone.utc) + expires_delta  # Fecha de expiración con zona horaria UTC
     to_encode.update({"exp": expire})
-    secret_key = generate_secret_key(user)
+    secret_key = generate_secret_key(user)  # Clave secreta específica del usuario
     encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=ALGORITHM)
     return encoded_jwt
 

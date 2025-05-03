@@ -4,7 +4,6 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-# Modelo de base de datos
 class User(Base):
     __tablename__ = 'users'
     
@@ -16,7 +15,6 @@ class User(Base):
     phone = Column(String)
     address = Column(String)
 
-# Pydantic model para registro
 class UserCreate(BaseModel):
     name: str
     email: str
@@ -26,9 +24,7 @@ class UserCreate(BaseModel):
     address: str
 
     class Config:
-        orm_mode = True
-
-# Pydantic model para login
+        from_attributes = True 
 class UserLogin(BaseModel):
     email: str
     password: str
