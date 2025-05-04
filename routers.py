@@ -6,6 +6,7 @@ from models import UserCreate, UserLogin, User, ProjectCreate, Project
 import os
 from shadai.core.session import Session as ShadaiSession  
 from helpers import ingest_documents_with_alias, chat_with_history, ingest_documents_without_alias
+import json
 
 router = APIRouter()
 
@@ -122,6 +123,7 @@ async def get_user_projects(user_id: int, db: Session = Depends(get_db)):
 
     return projects
 
+
 @router.get("/projects/check/{user_id}")
 async def check_document_content(user_id: int):
     user_upload_dir = os.path.join("uploads", str(user_id))
@@ -139,7 +141,6 @@ async def check_document_content(user_id: int):
             prompt_message = f.read()
             print(f"Prompt message: {prompt_message}")
 
-
         async with ShadaiSession(type="standard", delete=True) as session:
             await ingest_documents_without_alias(input_dir=user_upload_dir, session=session)
 
@@ -150,9 +151,15 @@ async def check_document_content(user_id: int):
                 message="Eres un analista experto en proyectos tecnológicos y educativos. Evalúa con detalle técnico y pedagógico."
             )
 
+        # Convertir el resultado de string a JSON
+        try:
+            analysis_result = json.loads(query_result)  # Convertir el string JSON a un diccionario
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=500, detail="Failed to parse analysis result as JSON.")
+
         return {
             "user_id": user_id,
-            "analysis_result": query_result
+            "analysis_result": analysis_result
         }
 
     except Exception as e:
