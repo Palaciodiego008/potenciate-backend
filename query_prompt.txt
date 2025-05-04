@@ -1,0 +1,21 @@
+Analiza este documento como si fueras un experto en evaluación de proyectos. Quiero que identifiques lo siguiente:
+
+1. Estructura del proyecto: resume brevemente cómo está organizado.
+2. Costos estimados: identifica si hay estimaciones de costos o suposiciones relacionadas al presupuesto.
+3. Viabilidad: evalúa si el proyecto parece realista y factible con base en el contenido.
+4. Errores o debilidades: señala fallas técnicas, lógicas o ausencias importantes.
+5. Sugerencias de mejora: propone cambios para optimizar el proyecto.
+6. Recursos educativos recomendados: sugiere recursos (cursos, artículos, herramientas) para fortalecer el conocimiento relacionado.
+
+Devuelve exclusivamente la respuesta en este formato JSON:
+
+{
+  "estructura": "...",
+  "costos": "...",
+  "viabilidad": "...",
+  "errores_debilidades": "...",
+  "sugerencias_mejora": "...",
+  "recursos_educativos": "..."
+}
+
+No añadas ningún texto adicional fuera del JSON.

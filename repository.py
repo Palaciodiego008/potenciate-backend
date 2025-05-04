@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from models import User, Project
+from models import User, Project, ProjectCreate
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import os
@@ -47,16 +47,28 @@ def get_user_by_id(db: Session, user_id: int):
 def get_all_users(db: Session):
     return db.query(User).all()
 
-def create_project(db: Session, project_data, file: UploadFile):
+def create_project(db: Session, project_data: ProjectCreate, file: UploadFile):
     user_dir = Path("uploads") / str(project_data.user_id)
     user_dir.mkdir(parents=True, exist_ok=True)
 
+    # Asegurarse de que el nombre del archivo es válido
     file_name = file.filename
+    if not file_name:
+        raise ValueError("Uploaded file has no filename")
+
     file_path = user_dir / file_name
 
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Guardar archivo
+    with open(file_path, "wb") as f:
+        f.write(file.file.read())
 
+    # convert user_id string to int
+    try:
+        project_data.user_id = int(project_data.user_id)
+    except ValueError:
+        raise ValueError("user_id must be an integer")
+   
+   
     db_project = Project(
         title=project_data.title,
         description=project_data.description,

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, Form
 from sqlalchemy.orm import Session
 from auth import create_access_token, get_password_hash, authenticate_user
 from repository import SessionLocal, create_user, get_user_by_email, create_project
-from models import UserCreate, UserLogin, User, ProjectCreate
+from models import UserCreate, UserLogin, User, ProjectCreate, Project
 import os
 from shadai.core.session import Session as ShadaiSession  
 from helpers import ingest_documents_with_alias, chat_with_history, ingest_documents_without_alias
@@ -67,19 +67,15 @@ async def create_new_project(
     description: str = Form(...),
     objetive: str = Form(...),
     area: str = Form(...),
-    user_id: int = Form(...),
+    user_id: str = Form(...),
     file: UploadFile = UploadFile(...),
     db: Session = Depends(get_db)
 ):
+    print("title:", title)
     if not title or not description or not objetive or not area or not user_id:
         raise HTTPException(status_code=400, detail="All fields are required")
     if not file:
         raise HTTPException(status_code=400, detail="File is required")
-    if file.content_type not in [
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    ]:
-        raise HTTPException(status_code=400, detail="Invalid file type. Only PDF and DOCX are allowed")
 
     # Crear instancia de datos del proyecto
     project_data = ProjectCreate(
@@ -90,8 +86,11 @@ async def create_new_project(
         user_id=user_id
     )
 
+    print(f"Project data: {project_data}")
+
     # Guardar el proyecto en DB y subir el archivo en create_project
     db_project = create_project(db, project_data=project_data, file=file)
+    print(f"DB Project: {db_project}")
 
     filename = db_project.file.split("/")[-1]
     file_url = f"/uploads/{user_id}/{filename}"
@@ -103,25 +102,52 @@ async def create_new_project(
         "file_url": file_url
     }
 
+
+@router.get("/projects")
+async def get_all_projects(db: Session = Depends(get_db)):
+    projects = db.query(Project).all()
+    if not projects:
+        raise HTTPException(status_code=404, detail="No projects found")
+    return projects
+
+@router.get("/projects/user/{user_id}")
+async def get_user_projects(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    projects = db.query(Project).filter(Project.user_id == user_id).all()
+    if not projects:
+        raise HTTPException(status_code=404, detail="No projects found for this user")
+
+    return projects
+
 @router.get("/projects/check/{user_id}")
 async def check_document_content(user_id: int):
     user_upload_dir = os.path.join("uploads", str(user_id))
-
-    alias = user_upload_dir.split("/")[-1]
+    query_prompt_path = "query_prompt.txt"
 
     if not os.path.exists(user_upload_dir) or not os.listdir(user_upload_dir):
         raise HTTPException(status_code=404, detail="No documents found for this user.")
 
+    if not os.path.exists(query_prompt_path):
+        raise HTTPException(status_code=400, detail="query_prompt.txt not found in user directory.")
+
     try:
+        # Leer el contenido del archivo .txt como prompt
+        with open(query_prompt_path, "r", encoding="utf-8") as f:
+            prompt_message = f.read()
+            print(f"Prompt message: {prompt_message}")
+
+
         async with ShadaiSession(type="standard", delete=True) as session:
-            # Ingestar documentos usando la misma sesión
-            await  ingest_documents_without_alias(input_dir=user_upload_dir, session=session)
-            
-            # Realizar el análisis del chat usando la misma sesión
+            await ingest_documents_without_alias(input_dir=user_upload_dir, session=session)
+
+            # Usar el prompt leído del archivo para el análisis
             query_result = await chat_with_history(
                 session=session,
-                message="¿De qué trata este documento?",
-                system_prompt="Eres un experto en análisis de documentos y tienes acceso al contenido."
+                system_prompt=prompt_message,
+                message="Eres un analista experto en proyectos tecnológicos y educativos. Evalúa con detalle técnico y pedagógico."
             )
 
         return {
