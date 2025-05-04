@@ -2,3 +2,4 @@ sqlalchemy
 pydantic
 passlib[bcrypt]
 PyJWT
+shadai

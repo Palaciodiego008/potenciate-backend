@@ -48,11 +48,12 @@ def get_all_users(db: Session):
     return db.query(User).all()
 
 def create_project(db: Session, project_data, file: UploadFile):
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") 
-    file_name = f"{timestamp}_{file.filename}"
-    
-    file_path = UPLOAD_DIR / file_name
-    
+    user_dir = Path("uploads") / str(project_data.user_id)
+    user_dir.mkdir(parents=True, exist_ok=True)
+
+    file_name = file.filename
+    file_path = user_dir / file_name
+
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
@@ -65,11 +66,8 @@ def create_project(db: Session, project_data, file: UploadFile):
         file=str(file_path)
     )
 
-    # Agregar el proyecto a la base de datos
     db.add(db_project)
     db.commit()
     db.refresh(db_project)
-    
+
     return db_project
-
-

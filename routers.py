@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 from auth import create_access_token, get_password_hash, authenticate_user
 from repository import SessionLocal, create_user, get_user_by_email, create_project
 from models import UserCreate, UserLogin, User, ProjectCreate
-
+import os
+from shadai.core.session import Session as ShadaiSession  
+from helpers import ingest_documents_with_alias, chat_with_history, ingest_documents_without_alias
 
 router = APIRouter()
 
@@ -60,7 +62,7 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/projects")
-def create_new_project(
+async def create_new_project(
     title: str = Form(...),
     description: str = Form(...),
     objetive: str = Form(...),
@@ -73,9 +75,13 @@ def create_new_project(
         raise HTTPException(status_code=400, detail="All fields are required")
     if not file:
         raise HTTPException(status_code=400, detail="File is required")
-    if file.content_type not in ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:
+    if file.content_type not in [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ]:
         raise HTTPException(status_code=400, detail="Invalid file type. Only PDF and DOCX are allowed")
 
+    # Crear instancia de datos del proyecto
     project_data = ProjectCreate(
         title=title,
         description=description,
@@ -84,12 +90,11 @@ def create_new_project(
         user_id=user_id
     )
 
-    print("project data =======>", project_data)
-
+    # Guardar el proyecto en DB y subir el archivo en create_project
     db_project = create_project(db, project_data=project_data, file=file)
 
     filename = db_project.file.split("/")[-1]
-    file_url = f"/uploads/{filename}"
+    file_url = f"/uploads/{user_id}/{filename}"
 
     return {
         "id": db_project.id,
@@ -97,3 +102,32 @@ def create_new_project(
         "description": db_project.description,
         "file_url": file_url
     }
+
+@router.get("/projects/check/{user_id}")
+async def check_document_content(user_id: int):
+    user_upload_dir = os.path.join("uploads", str(user_id))
+
+    alias = user_upload_dir.split("/")[-1]
+
+    if not os.path.exists(user_upload_dir) or not os.listdir(user_upload_dir):
+        raise HTTPException(status_code=404, detail="No documents found for this user.")
+
+    try:
+        async with ShadaiSession(type="standard", delete=True) as session:
+            # Ingestar documentos usando la misma sesión
+            await  ingest_documents_without_alias(input_dir=user_upload_dir, session=session)
+            
+            # Realizar el análisis del chat usando la misma sesión
+            query_result = await chat_with_history(
+                session=session,
+                message="¿De qué trata este documento?",
+                system_prompt="Eres un experto en análisis de documentos y tienes acceso al contenido."
+            )
+
+        return {
+            "user_id": user_id,
+            "analysis_result": query_result
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error analyzing document(s): {str(e)}")
